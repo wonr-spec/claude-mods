@@ -17,6 +17,7 @@ Claude Code mod 모음 저장소입니다. 저장소 전체가 하나의 마켓�
 | mod | 설명 |
 | --- | --- |
 | [session-activity](plugins/session-activity) | 세션 도구 호출 현황 패널과 상태줄, `/activity` 명령 |
+| [prompt-suggest](plugins/prompt-suggest) | 턴이 끝나면 다음 프롬프트 후보 3개를 제안, `/suggest` 명령 |
 
 ## 새 mod 추가
 

@@ -1,0 +1,7 @@
+{
+  "name": "prompt-suggest",
+  "version": "0.1.0",
+  "description": "턴이 끝나면 다음 프롬프트 후보 3개를 프롬프트 위에 제안",
+  "author": { "name": "wonr-spec" },
+  "types": "./types/index.d.ts"
+}

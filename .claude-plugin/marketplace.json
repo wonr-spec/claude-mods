@@ -1,12 +1,21 @@
 {
   "name": "wonr-mods",
-  "owner": { "name": "wonr-spec" },
-  "metadata": { "description": "wonr-spec의 Claude Code mod 모음" },
+  "owner": {
+    "name": "wonr-spec"
+  },
+  "metadata": {
+    "description": "wonr-spec의 Claude Code mod 모음"
+  },
   "plugins": [
     {
       "name": "session-activity",
       "source": "./plugins/session-activity",
       "description": "세션 도구 호출 현황 패널과 상태줄"
+    },
+    {
+      "name": "prompt-suggest",
+      "source": "./plugins/prompt-suggest",
+      "description": "턴이 끝나면 다음 프롬프트 후보 3개를 입력창 위에 제안"
     }
   ]
 }
