@@ -23,6 +23,21 @@ async function refresh($: EngineInterface) {
   }
 }
 
+async function runSuggest($: EngineInterface, args: string): Promise<string> {
+  const arg = args.trim().toLowerCase()
+  if (arg === 'on' || arg === 'off') {
+    const value = arg === 'on'
+    await $.store.set(STORE_KEY, value)
+    await update($, isEnabled, () => value)
+    if (!value) await update($, suggestions, () => [])
+
+    return `자동 프롬프트 제안을 ${value ? '켰' : '껐'}습니다.`
+  }
+  await refresh($)
+
+  return '다음 프롬프트 후보를 입력창 위에 표시했습니다.'
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -35,22 +50,12 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('command.run', { command: 'suggest' }, async ($, e) => {
-    const arg = e.args.trim().toLowerCase()
-    if (arg === 'on' || arg === 'off') {
-      const value = arg === 'on'
-      await $.store.set(STORE_KEY, value)
-      await update($, isEnabled, () => value)
-      if (!value) await update($, suggestions, () => [])
-
-      return { text: `자동 프롬프트 제안을 ${value ? '켰' : '껐'}습니다.` }
-    }
-    await refresh($)
-
-    return { text: '다음 프롬프트 후보를 입력창 위에 표시했습니다.' }
-  })
+  on('command.run', { command: 'suggest' }, async ($, e) => ({ text: await runSuggest($, e.args) }))
 
   on('prompt.submit', async ($, e, next) => {
+    // 슬래시 명령이 command.run으로 오지 않고 프롬프트로 들어올 때의 대체 처리: "/suggest [on|off]"
+    const m = /^\s*\/suggest(?:\s+(on|off))?\s*$/i.exec(e.text)
+    if (m !== null) return { drop: await runSuggest($, m[1] ?? '') }
     await update($, suggestions, () => [])
 
     return next(e)

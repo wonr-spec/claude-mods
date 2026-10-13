@@ -21,6 +21,13 @@ export const register: Register = on => {
     return { text: '세션 활동 패널을 열었습니다.' }
   })
 
+  // 슬래시 명령이 command.run으로 오지 않고 프롬프트로 들어올 때의 대체 처리: "/activity"
+  on('prompt.submit', async ($, e, next) => {
+    if (!/^\s*\/activity\s*$/.test(e.text)) return next(e)
+    await $.ui.open({ id: PANE, title: TITLE })
+    return { drop: '세션 활동 패널을 열었습니다.' }
+  }).catch(($, e, next) => next(e))
+
   on('tool.call', async ($, e, next) => {
     const call: ToolCall = { id: e.tool_use_id, tool: e.tool, isDone: false, isError: false }
     await update($, calls, list => [...list, call].slice(-200))

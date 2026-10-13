@@ -30,3 +30,9 @@ test('PNG 크기를 읽고 SVG로 감싼다', () => {
 test('CSV를 마크다운 표로 만든다', () => {
   expect(tableMarkdown('a,b\n1,2\n3', ',')).toBe('| a | b |\n| --- | --- |\n| 1 | 2 |\n| 3 |  |')
 })
+
+test('"/preview <경로>" 프롬프트는 턴 없이 처리한다', async ($, on) => {
+  on('fs.exists', () => ({ value: false }) as never)
+  const r = await $.prompt.submit({ text: '/preview 없는파일.png' } as never)
+  expect(r).toEqual({ drop: '파일이 없습니다: 없는파일.png' })
+})

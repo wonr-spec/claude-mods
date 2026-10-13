@@ -33,6 +33,28 @@ async function openExternally($: EngineInterface, path: string) {
   if (linux?.exitCode !== 0) $.ui.toast(`열 수 없습니다: ${baseName(path)}`)
 }
 
+async function runPreview($: EngineInterface, args: string): Promise<string> {
+  const arg = args.trim()
+  if (arg === 'on' || arg === 'off') {
+    const value = arg === 'on'
+    await $.store.set(STORE_AUTO, value)
+    await update($, isAuto, () => value)
+
+    return `새 파일 자동 미리보기를 ${value ? '켰' : '껐'}습니다.`
+  }
+  if (arg !== '') {
+    const path = arg.replace(/^['"]|['"]$/g, '')
+    if (kindOf(path) === undefined) return `미리보기를 지원하지 않는 형식입니다: ${baseName(path)}`
+    if (!(await $.fs.exists(path))) return `파일이 없습니다: ${path}`
+    await track($, path)
+  }
+  const { isPlaced } = await $.ui.open({ id: PANE, title: TITLE })
+
+  return isPlaced
+    ? '파일 미리보기 패널을 열었습니다.'
+    : '파일 미리보기 패널을 열려고 했지만, 지금 화면(앱)이 mod 패널을 표시하지 않습니다.'
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -45,25 +67,14 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('command.run', { command: 'preview' }, async ($, e) => {
-    const arg = e.args.trim()
-    if (arg === 'on' || arg === 'off') {
-      const value = arg === 'on'
-      await $.store.set(STORE_AUTO, value)
-      await update($, isAuto, () => value)
+  on('command.run', { command: 'preview' }, async ($, e) => ({ text: await runPreview($, e.args) }))
 
-      return { text: `새 파일 자동 미리보기를 ${value ? '켰' : '껐'}습니다.` }
-    }
-    if (arg !== '') {
-      const path = arg.replace(/^['"]|['"]$/g, '')
-      if (kindOf(path) === undefined) return { text: `미리보기를 지원하지 않는 형식입니다: ${baseName(path)}` }
-      if (!(await $.fs.exists(path))) return { text: `파일이 없습니다: ${path}` }
-      await track($, path)
-    }
-    await $.ui.open({ id: PANE, title: TITLE })
-
-    return { text: '파일 미리보기 패널을 열었습니다.' }
-  })
+  // 슬래시 명령이 command.run으로 오지 않고 프롬프트로 들어올 때의 대체 처리: "/preview <경로>"
+  on('prompt.submit', async ($, e, next) => {
+    const m = /^\s*\/preview(?:\s+([\s\S]*))?$/.exec(e.text)
+    if (m === null) return next(e)
+    return { drop: await runPreview($, m[1] ?? '') }
+  }).catch(($, e, next) => next(e))
 
   on('tool.call', { tool: 'Write' }, async ($, e, next) => {
     const ran = await next(e)
