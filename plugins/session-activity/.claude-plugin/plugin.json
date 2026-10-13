@@ -1,0 +1,9 @@
+{
+  "name": "session-activity",
+  "version": "0.1.0",
+  "description": "세션 도구 호출 현황 패널과 상태줄",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "wonr-spec"
+  }
+}
