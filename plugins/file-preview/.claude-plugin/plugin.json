@@ -1,0 +1,7 @@
+{
+  "name": "file-preview",
+  "version": "0.1.0",
+  "description": "Claude가 만들거나 고친 이미지·문서 파일을 패널에서 바로 미리보기",
+  "author": { "name": "wonr-spec" },
+  "types": "./types/index.d.ts"
+}

@@ -16,6 +16,11 @@
       "name": "prompt-suggest",
       "source": "./plugins/prompt-suggest",
       "description": "턴이 끝나면 다음 프롬프트 후보 3개를 입력창 위에 제안"
+    },
+    {
+      "name": "file-preview",
+      "source": "./plugins/file-preview",
+      "description": "Claude가 만든 이미지·문서 파일을 패널에서 미리보기"
     }
   ]
 }
