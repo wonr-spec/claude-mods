@@ -1,7 +1,7 @@
 {
   "name": "session-activity",
-  "version": "0.1.0",
-  "description": "세션 도구 호출 현황 패널과 상태줄",
+  "version": "0.2.0",
+  "description": "실패하거나 보안상 위험한 도구 사용만 알림·상태줄·패널로 표시",
   "types": "./types/index.d.ts",
   "author": {
     "name": "wonr-spec"

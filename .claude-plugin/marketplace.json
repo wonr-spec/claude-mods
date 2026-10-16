@@ -10,7 +10,7 @@
     {
       "name": "session-activity",
       "source": "./plugins/session-activity",
-      "description": "세션 도구 호출 현황 패널과 상태줄"
+      "description": "실패하거나 보안상 위험한 도구 사용만 표시"
     },
     {
       "name": "prompt-suggest",

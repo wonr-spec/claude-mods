@@ -1,80 +1,116 @@
 import { atom, read, update } from 'claude-code'
-import type { Register } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
 
-import type { ToolCall } from '../types'
+import type { ToolEvent } from '../types'
+import { failureOf, riskOf, summaryOf } from './risk'
 
 const PANE = 'session-activity'
-const TITLE = '세션 활동'
-const calls = atom({ plugin: 'session-activity', key: 'calls' } as const, [])
-const total = atom({ plugin: 'session-activity', key: 'total' } as const, 0)
+const TITLE = '도구 주의 알림'
+const events = atom({ plugin: 'session-activity', key: 'events' } as const, [] as ToolEvent[])
+const risky = atom({ plugin: 'session-activity', key: 'risky' } as const, 0)
 const failed = atom({ plugin: 'session-activity', key: 'failed' } as const, 0)
+
+async function showStatus($: EngineInterface) {
+  const r = await read($, risky)
+  const f = await read($, failed)
+  const parts = [r > 0 ? `위험 ${r}` : '', f > 0 ? `실패 ${f}` : ''].filter(p => p !== '')
+  $.ui.status(parts.length > 0 ? `도구 ${parts.join(' · ')}` : undefined)
+}
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'activity', description: '세션 활동 패널 열기' })
-    void $.ui.open({ id: PANE, title: TITLE })
+    await $.command.register({ name: 'activity', description: '실패하거나 위험한 도구 사용 목록 열기' })
+    await showStatus($)
     return next(e)
   })
 
   on('command.run', { command: 'activity' }, async $ => {
     await $.ui.open({ id: PANE, title: TITLE })
-    return { text: '세션 활동 패널을 열었습니다.' }
+    return { text: '도구 주의 알림 패널을 열었습니다.' }
   })
 
   // 슬래시 명령이 command.run으로 오지 않고 프롬프트로 들어올 때의 대체 처리: "/activity"
   on('prompt.submit', async ($, e, next) => {
     if (!/^\s*\/activity\s*$/.test(e.text)) return next(e)
     await $.ui.open({ id: PANE, title: TITLE })
-    return { drop: '세션 활동 패널을 열었습니다.' }
+    return { drop: '도구 주의 알림 패널을 열었습니다.' }
   }).catch(($, e, next) => next(e))
 
   on('tool.call', async ($, e, next) => {
-    const call: ToolCall = { id: e.tool_use_id, tool: e.tool, isDone: false, isError: false }
-    await update($, calls, list => [...list, call].slice(-200))
-    const count = await update($, total, n => n + 1)
-    $.ui.status(`도구 ${count}회 · 실행 중: ${e.tool}`)
+    const input = e as unknown as Record<string, unknown>
+    const risk = riskOf(e.tool, input)
+    const summary = summaryOf(e.tool, input)
+
+    if (risk !== undefined) {
+      const event: ToolEvent = { id: e.tool_use_id, tool: e.tool, summary, risk, isDone: false }
+      await update($, events, list => [...list, event].slice(-100))
+      await update($, risky, n => n + 1)
+      $.ui.toast(`위험할 수 있는 도구 사용: ${e.tool} — ${risk}`)
+      await showStatus($)
+      void $.ui.open({ id: PANE, title: TITLE })
+    }
 
     const ran = await next(e)
-    const isError = ran.deny !== undefined || ran.isError === true
-    await update($, calls, list =>
-      list.map(one => (one.id === call.id ? { ...one, isDone: true, isError } : one)),
-    )
-    const fails = isError ? await update($, failed, n => n + 1) : await read($, failed)
-    $.ui.status(`도구 ${count}회${fails > 0 ? ` · 실패 ${fails}` : ''}`)
+    const failure = failureOf(ran)
+
+    if (risk !== undefined || failure !== undefined) {
+      await update($, events, list => {
+        const known = list.some(one => one.id === e.tool_use_id)
+        const done = { id: e.tool_use_id, tool: e.tool, summary, risk, failure, isDone: true }
+        return known ? list.map(one => (one.id === e.tool_use_id ? done : one)) : [...list, done].slice(-100)
+      })
+      if (failure !== undefined) {
+        await update($, failed, n => n + 1)
+        await showStatus($)
+      }
+    }
 
     return ran
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
-    const list = await read($, calls)
-    const count = await read($, total)
-    const fails = await read($, failed)
-
-    const byTool = new Map<string, number>()
-    for (const one of list) byTool.set(one.tool, (byTool.get(one.tool) ?? 0) + 1)
-    const top = [...byTool.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
-
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const list = await read($, events)
+    const r = await read($, risky)
+    const f = await read($, failed)
     const rows = e.viewport?.rows ?? 24
-    const room = Math.max(1, rows - 6 - top.length)
+    const room = Math.max(1, Math.floor((rows - 4) / 2))
 
     return (
       <Box flexDirection="column">
         <Text bold>
-          전체 {count}회 · 실패 {fails}회
+          위험 {r}회 · 실패 {f}회
         </Text>
-        {top.map(([tool, n]) => (
-          <Text dimColor>
-            {tool} {n}
-          </Text>
-        ))}
-        <Text bold>최근 호출</Text>
-        {list.length === 0 && <Text dimColor>아직 도구 호출이 없습니다.</Text>}
-        {list.slice(-room).map(call => (
-          <Text dimColor={call.isDone && !call.isError} color={call.isError ? 'red' : undefined}>
-            {call.isDone ? (call.isError ? '실패' : '완료') : '실행'} {call.tool}
-          </Text>
-        ))}
+        {list.length === 0 && <Text dimColor>실패하거나 위험한 도구 사용이 아직 없습니다.</Text>}
+        {list
+          .slice(-room)
+          .reverse()
+          .map(one => (
+            <Box flexDirection="column">
+              <Text color={one.risk !== undefined ? 'yellow' : 'red'}>
+                {[one.risk !== undefined ? '위험' : '', one.failure !== undefined ? '실패' : ''].filter(s => s !== '').join('·')}{' '}
+                {one.tool}
+                {!one.isDone ? ' (실행 중)' : ''}: {one.risk ?? one.failure}
+              </Text>
+              <Text dimColor>
+                {'  '}
+                {one.summary}
+                {one.risk !== undefined && one.failure !== undefined ? ` — ${one.failure}` : ''}
+              </Text>
+            </Box>
+          ))}
+        {list.length > 0 && (
+          <Button
+            key="clear"
+            label="목록 비우기"
+            onPress={async () => {
+              await update($, events, () => [])
+              await update($, risky, () => 0)
+              await update($, failed, () => 0)
+              await showStatus($)
+            }}
+          />
+        )}
       </Box>
     )
   })
